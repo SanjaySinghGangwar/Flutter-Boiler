@@ -434,6 +434,78 @@ class User extends Equatable {
 
 ---
 
+### `late` keyword
+
+- Declares a non-nullable variable that will be initialized before first use
+- Used when you can't initialize at declaration but guarantee it before access
+- `late final` = lazy singleton pattern
+
+```dart
+late String name;
+void init() { name = "Sanjay"; }
+// accessing name before init() throws LateInitializationError
+```
+
+---
+
+### `covariant` keyword
+
+- Overrides Dart's type-safe parameter rule in subclasses
+- Allows a subclass to narrow a parameter type
+
+```dart
+class Animal { void feed(Animal food) {} }
+class Cat extends Animal {
+  @override
+  void feed(covariant Cat food) {} // narrows Animal → Cat
+}
+```
+
+---
+
+### Dart 3 Features — Sealed Classes, Records, Patterns
+
+**Sealed classes:**
+- Closed hierarchy — all subclasses must be in the same file
+- Enables exhaustive switch (compiler checks all cases)
+
+```dart
+sealed class Shape {}
+class Circle extends Shape { final double radius; Circle(this.radius); }
+class Square extends Shape { final double side; Square(this.side); }
+
+double area(Shape s) => switch (s) {
+  Circle c => 3.14 * c.radius * c.radius,
+  Square sq => sq.side * sq.side,
+};
+```
+
+**Records (Dart 3):**
+- Lightweight, anonymous, immutable data types
+
+```dart
+(String, int) user = ("Sanjay", 25);
+print(user.$1); // Sanjay
+print(user.$2); // 25
+
+// Named fields
+({String name, int age}) person = (name: "Sanjay", age: 25);
+print(person.name);
+```
+
+**Pattern matching:**
+
+```dart
+final point = (x: 3, y: 0);
+switch (point) {
+  case (x: 0, y: 0): print("Origin");
+  case (x: var x, y: 0): print("On x-axis at $x");
+  case _: print("Somewhere else");
+}
+```
+
+---
+
 ## 2. Flutter Core
 
 ### What is Flutter?
@@ -634,6 +706,117 @@ class BounceCurve extends Curve {
   double transform(double t) => t * t * (3 - 2 * t);
 }
 ```
+
+---
+
+### Hero Animations
+
+Shared element transition between two screens. Wrap the same `tag` on both screens.
+
+```dart
+// Screen 1
+Hero(
+  tag: 'avatar-${user.id}',
+  child: CircleAvatar(backgroundImage: NetworkImage(user.avatarUrl)),
+)
+
+// Screen 2
+Hero(
+  tag: 'avatar-${user.id}',
+  child: Image.network(user.avatarUrl),
+)
+```
+
+Rules:
+- Tags must be unique on each page.
+- Both source and destination Hero must exist in the widget tree during the transition.
+
+---
+
+### Slivers
+
+Slivers are scrollable areas that can be composed into a `CustomScrollView`. More powerful than `ListView` or `GridView` alone.
+
+| Widget | Purpose |
+|--------|---------|
+| `SliverAppBar` | Collapsing/expanding app bar |
+| `SliverList` | Lazy list inside CustomScrollView |
+| `SliverGrid` | Grid inside CustomScrollView |
+| `SliverToBoxAdapter` | Embed a non-sliver widget |
+| `SliverFillRemaining` | Fill remaining viewport space |
+
+```dart
+CustomScrollView(
+  slivers: [
+    SliverAppBar(
+      expandedHeight: 200,
+      floating: false,
+      pinned: true,
+      flexibleSpace: FlexibleSpaceBar(title: Text('My App')),
+    ),
+    SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => ListTile(title: Text('Item $index')),
+        childCount: 50,
+      ),
+    ),
+  ],
+)
+```
+
+---
+
+### CustomPainter / Canvas
+
+Draw custom shapes, charts, or effects using the Canvas API.
+
+```dart
+class MyPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.blue
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(Offset(size.width / 2, size.height / 2), 50, paint);
+    canvas.drawLine(Offset(0, 0), Offset(size.width, size.height), paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+// Usage
+CustomPaint(
+  painter: MyPainter(),
+  child: SizedBox(width: 200, height: 200),
+)
+```
+
+---
+
+### `RepaintBoundary`
+
+Isolates a subtree into its own rendering layer. When that subtree repaints, the rest of the screen is unaffected.
+
+```dart
+RepaintBoundary(
+  child: AnimatedWidget(), // Only this widget repaints on animation
+)
+```
+
+Use when: complex animations, frequently updating widgets (clocks, charts), widgets that don't affect surrounding layout.
+
+---
+
+### `Opacity` vs `Visibility` vs `Offstage`
+
+| Widget | Renders? | Takes space? | Best for |
+|--------|----------|-------------|---------|
+| `Opacity(opacity: 0)` | Yes | Yes | Animations, fade effects |
+| `Visibility(visible: false)` | No | Yes (default) | Toggle visibility, keep layout |
+| `Offstage(offstage: true)` | No | No | Pre-build hidden widgets |
 
 ---
 
@@ -1248,6 +1431,132 @@ Avoid for large apps — lacks enforced architecture.
 
 ---
 
+### Riverpod (Detailed)
+
+Key provider types:
+
+| Provider | Use case |
+|----------|---------|
+| `Provider` | Synchronous read-only value |
+| `StateProvider` | Simple mutable state (counter, toggle) |
+| `FutureProvider` | Async one-time fetch |
+| `StreamProvider` | Continuous stream |
+| `NotifierProvider` | Complex state with methods (replaces StateNotifier) |
+| `AsyncNotifierProvider` | Async complex state |
+
+```dart
+// Define
+final counterProvider = NotifierProvider<CounterNotifier, int>(CounterNotifier.new);
+
+class CounterNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void increment() => state++;
+}
+
+// Read in widget (ConsumerWidget)
+class CounterWidget extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(counterProvider);
+    return Column(children: [
+      Text('$count'),
+      ElevatedButton(
+        onPressed: () => ref.read(counterProvider.notifier).increment(),
+        child: Text('Increment'),
+      ),
+    ]);
+  }
+}
+```
+
+`family` — parameterized providers:
+```dart
+final userProvider = FutureProvider.family<User, int>((ref, id) async {
+  return ref.watch(apiServiceProvider).getUser(id);
+});
+// usage: ref.watch(userProvider(42))
+```
+
+`autoDispose` — disposes provider when no longer listened:
+```dart
+final searchProvider = FutureProvider.autoDispose.family<List<Item>, String>(
+  (ref, query) => searchItems(query),
+);
+```
+
+---
+
+### Cubit vs BLoC
+
+| Feature | Cubit | BLoC |
+|---------|-------|------|
+| Input | Method calls | Events |
+| Output | States | States |
+| Boilerplate | Less | More |
+| Traceability | Lower | Higher (event log) |
+| Best for | Simple state | Complex event-driven flows |
+
+```dart
+// Cubit — simpler
+class CounterCubit extends Cubit<int> {
+  CounterCubit() : super(0);
+  void increment() => emit(state + 1);
+}
+
+// BLoC — explicit events
+class CounterBloc extends Bloc<CounterEvent, int> {
+  CounterBloc() : super(0) {
+    on<IncrementEvent>((event, emit) => emit(state + 1));
+  }
+}
+```
+
+---
+
+### `ValueNotifier` / `ValueListenableBuilder`
+
+Lightweight built-in state for a single value — no package needed.
+
+```dart
+final counter = ValueNotifier<int>(0);
+
+// In widget
+ValueListenableBuilder<int>(
+  valueListenable: counter,
+  builder: (context, value, _) => Text('$value'),
+)
+
+// Update
+counter.value++;
+```
+
+---
+
+### flutter_hooks
+
+Reuse stateful logic without `StatefulWidget`. Similar to React hooks.
+
+```dart
+class CounterWidget extends HookWidget {
+  @override
+  Widget build(BuildContext context) {
+    final counter = useState(0);           // replaces initState + setState
+    final controller = useAnimationController(duration: Duration(seconds: 1));
+    final scrollController = useScrollController();
+
+    return ElevatedButton(
+      onPressed: () => counter.value++,
+      child: Text('${counter.value}'),
+    );
+  }
+}
+```
+
+Common hooks: `useState`, `useEffect`, `useMemoized`, `useRef`, `useAnimationController`, `useScrollController`, `useTextEditingController`.
+
+---
+
 ## 4. Architecture & Patterns
 
 ### MVC vs MVP vs MVVM
@@ -1442,6 +1751,52 @@ class Person {
 
 ---
 
+### UseCase Pattern
+
+Each action in the domain layer is a single class with one `call()` method. Keeps business logic isolated and testable.
+
+```dart
+// Domain layer
+class GetUserUseCase {
+  final UserRepository _repo;
+  GetUserUseCase(this._repo);
+
+  Future<User> call(int id) => _repo.getUser(id);
+}
+
+// In ViewModel / BLoC
+final user = await getUserUseCase(42);
+```
+
+---
+
+### Either / Result Pattern (Error Handling in Clean Architecture)
+
+Instead of throwing exceptions, return a typed success or failure. Use `dartz` package.
+
+```dart
+import 'package:dartz/dartz.dart';
+
+// Repository returns Either<Failure, User>
+Future<Either<Failure, User>> getUser(int id) async {
+  try {
+    final user = await api.fetchUser(id);
+    return Right(user);
+  } catch (e) {
+    return Left(ServerFailure(e.toString()));
+  }
+}
+
+// In UseCase / ViewModel
+final result = await getUser(1);
+result.fold(
+  (failure) => print('Error: ${failure.message}'),
+  (user)    => print('User: ${user.name}'),
+);
+```
+
+---
+
 ## 5. Networking & Data
 
 ### HTTP Requests
@@ -1584,6 +1939,102 @@ flutter build ios --release    # iOS IPA (requires macOS + Xcode)
 
 ---
 
+### WebSockets
+
+Two-way persistent connection — ideal for real-time features (chat, live scores, trading).
+
+```dart
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+final channel = WebSocketChannel.connect(Uri.parse('wss://example.com/ws'));
+
+// Send
+channel.sink.add('Hello server');
+
+// Listen
+channel.stream.listen(
+  (message) => print('Received: $message'),
+  onDone: () => print('Connection closed'),
+  onError: (err) => print('Error: $err'),
+);
+
+// Close
+channel.sink.close();
+```
+
+---
+
+### GraphQL
+
+Query only the fields you need — reduces over-fetching.
+
+```dart
+// Using graphql_flutter
+final query = '''
+  query GetUser(\$id: ID!) {
+    user(id: \$id) { id name email }
+  }
+''';
+
+Query(
+  options: QueryOptions(
+    document: gql(query),
+    variables: {'id': '1'},
+  ),
+  builder: (result, {fetchMore, refetch}) {
+    if (result.isLoading) return CircularProgressIndicator();
+    final user = result.data?['user'];
+    return Text(user['name']);
+  },
+)
+```
+
+---
+
+### SSL Pinning
+
+Prevents man-in-the-middle attacks by trusting only a specific certificate.
+
+```dart
+// Using dio + native_dio_adapter or http_certificate_pinning
+SecurityContext context = SecurityContext(withTrustedRoots: false);
+context.setTrustedCertificatesBytes(certificateBytes);
+
+final client = HttpClient(context: context);
+```
+
+With Dio:
+```dart
+(dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+  client.badCertificateCallback = (cert, host, port) {
+    return cert.pem == pinnedCertificate;
+  };
+  return client;
+};
+```
+
+---
+
+### Biometric Authentication
+
+```dart
+import 'package:local_auth/local_auth.dart';
+
+final auth = LocalAuthentication();
+
+Future<bool> authenticate() async {
+  final canAuth = await auth.canCheckBiometrics;
+  if (!canAuth) return false;
+
+  return auth.authenticate(
+    localizedReason: 'Scan fingerprint to access',
+    options: AuthenticationOptions(biometricOnly: true),
+  );
+}
+```
+
+---
+
 ## 6. Testing
 
 ### Three Types of Tests
@@ -1685,6 +2136,47 @@ Run `flutter test --update-goldens` to regenerate reference images.
 
 ---
 
+### BLoC Testing (`bloc_test`)
+
+```dart
+import 'package:bloc_test/bloc_test.dart';
+
+blocTest<CounterBloc, int>(
+  'emits [1] when IncrementEvent is added',
+  build: () => CounterBloc(),
+  act: (bloc) => bloc.add(IncrementEvent()),
+  expect: () => [1],
+);
+
+// With setup and teardown
+blocTest<UserBloc, UserState>(
+  'emits loaded user on LoadUser event',
+  build: () => UserBloc(mockRepo),
+  setUp: () => when(mockRepo.getUser(1)).thenAnswer((_) async => fakeUser),
+  act: (bloc) => bloc.add(LoadUser(1)),
+  expect: () => [UserLoading(), UserLoaded(fakeUser)],
+);
+```
+
+---
+
+### Riverpod Testing
+
+```dart
+void main() {
+  test('counter starts at 0 and increments', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(counterProvider), 0);
+    container.read(counterProvider.notifier).increment();
+    expect(container.read(counterProvider), 1);
+  });
+}
+```
+
+---
+
 ## 7. Performance & Optimisation
 
 ### Reducing Widget Rebuilds
@@ -1754,6 +2246,65 @@ Adaptive layouts switch layouts at breakpoints (more predictable). Responsive la
 ### `FittedBox` for Responsive Text
 
 Automatically scales child to fit available space — prevents text overflow.
+
+---
+
+### Impeller vs Skia
+
+| | Skia | Impeller |
+|--|------|---------|
+| Type | 2D raster engine (CPU+GPU) | Pre-compiled Metal/Vulkan renderer |
+| Shader compilation | At runtime (causes jank) | At build time (no jank) |
+| Default on iOS | No (pre-Impeller) | Yes (Flutter 3.10+) |
+| Default on Android | Yes (legacy) | Opt-in / rolling out |
+| Performance | Good | Better — more consistent frame times |
+
+---
+
+### Shader Compilation Jank
+
+First time a shader (GPU program) is used, it must be compiled — causing a frame drop.
+
+Solutions:
+- **Impeller** (iOS default, Android rolling out) — pre-compiles shaders at build time.
+- **SkSL warm-up** — capture shaders in profile mode and bundle them: `flutter run --cache-sksl --purge-persistent-cache`
+- Use `--bundle-sksl-path` at build time to include pre-warmed shaders.
+
+---
+
+### Tree Shaking & App Size Reduction
+
+- Dart's compiler removes unused code automatically at build time.
+- Reduce size further:
+  - Run `flutter build apk --split-per-abi` to build separate APKs per architecture.
+  - Enable R8/ProGuard in `android/app/build.gradle`:
+    ```groovy
+    buildTypes {
+      release {
+        minifyEnabled true
+        shrinkResources true
+        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+      }
+    }
+    ```
+  - Use `flutter build apk --obfuscate --split-debug-info=debug/` to obfuscate Dart code.
+  - Compress and use WebP images instead of PNG.
+  - Use deferred imports for large features.
+
+---
+
+### Deferred Loading (Code Splitting)
+
+Load a library only when needed — reduces initial startup size.
+
+```dart
+import 'package:my_app/heavy_feature.dart' deferred as heavyFeature;
+
+Future<void> loadFeature() async {
+  await heavyFeature.loadLibrary();
+  heavyFeature.showFeature();
+}
+```
 
 ---
 
