@@ -684,6 +684,70 @@ GestureDetector(
 )
 ```
 
+### Draggable & DragTarget
+
+Used to implement drag-and-drop interactions.
+
+- `Draggable<T>` — the widget being dragged; carries data of type `T`
+- `DragTarget<T>` — accepts dropped data and reacts to it
+
+```dart
+Draggable<Color>(
+  data: Colors.blue,
+  feedback: Container(width: 80, height: 80, color: Colors.blue.withOpacity(0.5)),
+  childWhenDragging: Container(width: 80, height: 80, color: Colors.grey),
+  child: Container(width: 80, height: 80, color: Colors.blue),
+)
+
+DragTarget<Color>(
+  onAccept: (color) => setState(() => _targetColor = color),
+  builder: (context, candidateData, rejectedData) {
+    return Container(width: 120, height: 120, color: _targetColor);
+  },
+)
+```
+
+---
+
+### IndexedStack
+
+Keeps all children in memory but shows only one at a time — ideal for `BottomNavigationBar` to preserve tab state.
+
+```dart
+IndexedStack(
+  index: _selectedIndex, // which child to show
+  children: [HomeScreen(), SearchScreen(), ProfileScreen()],
+)
+```
+
+**vs `PageView`:** `PageView` lazily builds pages and discards them; `IndexedStack` always keeps all pages alive.
+
+---
+
+### Builder Widget
+
+A function that builds UI dynamically at runtime based on data, state, or constraints.
+
+| Builder | Purpose |
+|---------|---------|
+| `Builder` | Access `BuildContext` deeper in the tree |
+| `FutureBuilder` | Build UI from a one-time `Future` |
+| `StreamBuilder` | Build UI from a continuous `Stream` |
+| `LayoutBuilder` | Build based on parent constraints |
+| `ValueListenableBuilder` | React to `ValueNotifier` changes |
+
+```dart
+// Builder — needed to access Scaffold's context below the Scaffold itself
+Builder(
+  builder: (context) => ElevatedButton(
+    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Hello')),
+    ),
+    child: Text('Show Snackbar'),
+  ),
+)
+```
+
 ---
 
 ### Layout System
@@ -1601,6 +1665,23 @@ void main() {
   });
 }
 ```
+
+### Golden Tests (Screenshot Testing)
+
+Capture and compare widget screenshots to detect unexpected UI changes.
+
+```dart
+testWidgets('MyWidget golden test', (tester) async {
+  await tester.pumpWidget(MyWidget());
+  await expectLater(
+    find.byType(MyWidget),
+    matchesGoldenFile('goldens/my_widget.png'),
+  );
+});
+```
+
+Run `flutter test --update-goldens` to regenerate reference images.
+**Best for:** Design system components, catching accidental UI regressions.
 
 ---
 
