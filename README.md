@@ -4746,3 +4746,382 @@ FutureBuilder(
 );
 
 ```
+
+---
+
+## Rendering Pipeline
+
+```
+Widget Tree → Element Tree → Render Object Tree → Layout → Paint → Compositor → Screen
+```
+
+| Layer | Role |
+|-------|------|
+| **Widget** | Immutable UI description |
+| **Element** | Mutable instance, manages widget lifecycle |
+| **RenderObject** | Handles layout, sizing, and painting |
+
+---
+
+## Dio
+
+Powerful HTTP client for Flutter — more features than the default `http` package.
+
+**Key features:** Interceptors, timeouts, file upload/download, FormData, cancellation tokens, error handling.
+
+```dart
+final dio = Dio(BaseOptions(baseUrl: 'https://api.example.com'));
+
+// GET request
+final response = await dio.get('/users');
+
+// POST request
+final res = await dio.post('/login', data: {'email': 'a@b.com', 'password': '123'});
+```
+
+---
+
+## Interceptors (Dio)
+
+Intercept requests, responses, or errors before they reach the app.
+
+| Type | Purpose |
+|------|---------|
+| Request | Add auth token, modify headers |
+| Response | Process/transform response data |
+| Error | Handle 401/500 globally (e.g., token refresh) |
+
+```dart
+dio.interceptors.add(InterceptorsWrapper(
+  onRequest: (options, handler) {
+    options.headers['Authorization'] = 'Bearer $token';
+    return handler.next(options);
+  },
+  onError: (error, handler) {
+    if (error.response?.statusCode == 401) {
+      // refresh token logic
+    }
+    return handler.next(error);
+  },
+));
+```
+
+---
+
+## Unit Testing
+
+Tests individual functions, methods, or classes in isolation — no UI, no network.
+
+**Purpose:** Verify logic, catch bugs early, ensure correctness after changes.
+
+```dart
+// test/calculator_test.dart
+import 'package:flutter_test/flutter_test.dart';
+
+int add(int a, int b) => a + b;
+
+void main() {
+  test('adds two numbers', () {
+    expect(add(2, 3), equals(5));
+  });
+}
+```
+
+Run: `flutter test`
+
+---
+
+## Integration Testing
+
+Tests the full app flow — UI, API calls, and database together.
+
+**Purpose:** Verify modules integrate correctly, test real user flows, detect layer-boundary issues.
+
+```dart
+// integration_test/app_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('login flow', (tester) async {
+    await tester.pumpWidget(MyApp());
+    await tester.tap(find.byKey(Key('loginButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Home'), findsOneWidget);
+  });
+}
+```
+
+Run: `flutter test integration_test`
+
+---
+
+## Mocking APIs
+
+Simulate API responses during testing without real network calls.
+
+**Why:** Faster tests, works offline, test error and success cases deterministically.
+
+```dart
+// Using mockito + build_runner
+@GenerateMocks([UserRepository])
+void main() {
+  late MockUserRepository mockRepo;
+
+  setUp(() => mockRepo = MockUserRepository());
+
+  test('returns user on success', () async {
+    when(mockRepo.getUser(1)).thenAnswer((_) async => User(id: 1, name: 'Test'));
+    final user = await mockRepo.getUser(1);
+    expect(user.name, 'Test');
+  });
+}
+```
+
+---
+
+## GetIt
+
+Service locator for global dependency access — no `BuildContext` needed.
+
+```dart
+final getIt = GetIt.instance;
+
+void setup() {
+  getIt.registerSingleton<ApiService>(ApiService());
+  getIt.registerFactory<UserRepository>(() => UserRepositoryImpl(getIt()));
+}
+
+// Access anywhere
+final api = getIt<ApiService>();
+```
+
+---
+
+## Injectable
+
+Auto-generates `GetIt` registration code using annotations — eliminates manual setup.
+
+```dart
+@injectable
+class ApiService {
+  Future<List<User>> getUsers() async { ... }
+}
+
+@singleton
+class AuthService { ... }
+
+@lazySingleton
+class DatabaseService { ... }
+```
+
+Run `flutter pub run build_runner build` to generate the registration code.
+
+---
+
+## SQLite
+
+Relational local database using SQL queries. Good for structured, relational data.
+
+| Feature | Detail |
+|---------|--------|
+| Package | `sqflite` |
+| Data model | Tables, rows, columns |
+| Query style | SQL |
+| Best for | Structured data with relationships |
+
+```dart
+final db = await openDatabase('app.db', onCreate: (db, version) {
+  return db.execute('CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)');
+}, version: 1);
+
+await db.insert('users', {'name': 'Sanjay'});
+final users = await db.query('users');
+```
+
+---
+
+## Hive
+
+Lightweight key-value NoSQL database. Fast, no native dependencies.
+
+| Feature | Detail |
+|---------|--------|
+| Package | `hive` + `hive_flutter` |
+| Data model | Key-value pairs / typed boxes |
+| Performance | Faster than SQLite for simple reads |
+| Best for | Caching, settings, local storage |
+
+```dart
+await Hive.initFlutter();
+final box = await Hive.openBox('settings');
+
+box.put('theme', 'dark');
+final theme = box.get('theme'); // 'dark'
+```
+
+---
+
+## Isar
+
+High-performance NoSQL database designed for Flutter.
+
+| Feature | Detail |
+|---------|--------|
+| Package | `isar` + `isar_flutter_libs` |
+| Query style | Dart API (no SQL) |
+| Extras | Automatic indexes, complex queries, reactive queries |
+| Best for | Large datasets, offline-first, complex filtering |
+
+```dart
+final isar = await Isar.open([UserSchema]);
+
+await isar.writeTxn(() async {
+  await isar.users.put(User()..name = 'Sanjay');
+});
+
+final users = await isar.users.where().findAll();
+```
+
+---
+
+## Repository Pattern
+
+Abstracts data sources behind a clean interface so business logic doesn't care where data comes from (API, DB, cache).
+
+```
+UseCase → Repository Interface → RepositoryImpl → API / Database
+```
+
+```dart
+// Interface (Domain layer)
+abstract class UserRepository {
+  Future<User> getUser(int id);
+}
+
+// Implementation (Data layer)
+class UserRepositoryImpl implements UserRepository {
+  final ApiService _api;
+  UserRepositoryImpl(this._api);
+
+  @override
+  Future<User> getUser(int id) => _api.fetchUser(id);
+}
+```
+
+---
+
+## State Management Ranking
+
+| Solution | Best For |
+|----------|---------|
+| **Riverpod** | New apps — type-safe, no `BuildContext`, async-friendly, modern standard |
+| **BLoC** | Enterprise apps — strict event→state flow, highly testable |
+| **Provider** | Small/legacy apps — Flutter team's original recommendation |
+| **GetX** | Quick prototypes — simple but avoid for large apps |
+
+> Riverpod is becoming the modern default. BLoC remains strong in enterprise. Provider is mostly legacy. GetX has maintainability concerns at scale.
+
+---
+
+## GetX
+
+All-in-one package: state management + navigation + dependency injection.
+
+```dart
+// Controller
+class CounterController extends GetxController {
+  var count = 0.obs;
+  void increment() => count++;
+}
+
+// Usage in widget
+final controller = Get.put(CounterController());
+Obx(() => Text('${controller.count}'));
+
+// Navigation (no BuildContext needed)
+Get.to(SecondScreen());
+Get.back();
+```
+
+**Avoid for large apps** — lacks enforced architecture, harder to maintain.
+
+---
+
+## Facade Pattern
+
+Provides one simple interface to a complex subsystem of classes.
+
+```
+UI → UserFacade
+       ├── ApiService
+       ├── DatabaseService
+       └── CacheService
+```
+
+```dart
+class UserFacade {
+  final ApiService _api;
+  final DatabaseService _db;
+  final CacheService _cache;
+
+  UserFacade(this._api, this._db, this._cache);
+
+  Future<User> getUser(int id) async {
+    return _cache.get(id) ?? await _db.find(id) ?? await _api.fetch(id);
+  }
+}
+```
+
+**Benefit:** UI only talks to one class, hiding complexity behind a clean interface.
+
+---
+
+## Builder Widget
+
+A function that builds and returns a widget dynamically at runtime based on data, state, or constraints.
+
+| Builder | Purpose |
+|---------|---------|
+| `Builder` | Access `BuildContext` deeper in tree |
+| `FutureBuilder` | Build UI from a one-time `Future` |
+| `StreamBuilder` | Build UI from a continuous `Stream` |
+| `LayoutBuilder` | Build based on parent constraints |
+| `ValueListenableBuilder` | React to `ValueNotifier` changes |
+
+```dart
+// Builder — access context below Scaffold
+Builder(
+  builder: (context) {
+    return ElevatedButton(
+      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(...),
+      child: Text('Show Snackbar'),
+    );
+  },
+)
+```
+
+---
+
+## Isolates — compute()
+
+`compute()` is the simplest way to run a heavy function on a separate isolate without blocking the UI.
+
+```dart
+// Heavy function (must be top-level or static)
+List<int> parseData(String jsonString) {
+  return jsonDecode(jsonString).cast<int>();
+}
+
+// Run on background isolate
+final result = await compute(parseData, rawJson);
+```
+
+| API | Use Case |
+|-----|----------|
+| `compute()` | Simple one-off background task |
+| `Isolate.spawn()` | Long-running workers, full control |
+| `ReceivePort` / `SendPort` | Bidirectional communication channel |
+| `Isolate.exit()` / `kill()` | Lifecycle management |
